@@ -119,6 +119,9 @@ client.on('messageReactionAdd', (reaction) => {
   fs.writeFileSync(REACTIONS_STATS_FILE, JSON.stringify(reactionStats, null, 2));
 });
 
+app.get('/api/reactions-stats', (req, res) => {
+  res.status(200).json(reactionStats);
+});
 
 // Маршрут для отримання списку учасників сервера
 app.get('/api/members', async (req, res) => {
