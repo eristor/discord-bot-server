@@ -23,11 +23,17 @@ const GUILD_ID = process.env.GUILD_ID;
 const CHANNEL_ID = process.env.CHANNEL_ID;
 const PORT = process.env.PORT || 3000;
 const STATS_FILE = process.env.STATS_FILE_PATH || './userStats.json';
+const WINNERS_STATS_FILE = path.resolve('./freakWinners.json');
 
 let userStats = {};
+let freakWinners = {};
 
 if (fs.existsSync(STATS_FILE)) {
   userStats = JSON.parse(fs.readFileSync(STATS_FILE, 'utf8'));
+}
+
+if (fs.existsSync(WINNERS_STATS_FILE)) {
+  freakWinners = JSON.parse(fs.readFileSync(WINNERS_STATS_FILE, 'utf8'));
 }
 
 client.login(process.env.DISCORD_TOKEN);
@@ -119,6 +125,32 @@ client.on('messageCreate', (message) => {
     message.reply('Може таки тегним головного по фріковсту fr1kadelka🤡🤡🤡🤡?');
   }
 
+});
+
+// Маршрут для додавання нового переможця
+app.post('/api/add-winner', (req, res) => {
+  const { userId, username } = req.body;
+
+  if (!userId || !username) {
+    return res.status(400).send('Недостатньо даних.');
+  }
+
+  // Оновлення статистики
+  if (!freakWinners[userId]) {
+    freakWinners[userId] = { username, count: 0 };
+  }
+
+  freakWinners[userId].count += 1;
+
+  // Зберігаємо статистику у файл
+  fs.writeFileSync(WINNERS_STATS_FILE, JSON.stringify(freakWinners, null, 2));
+
+  res.status(200).send('Переможець доданий до статистики.');
+});
+
+// Маршрут для отримання статистики переможців
+app.get('/api/freak-stats', (req, res) => {
+  res.status(200).json(freakWinners);
 });
 
 // Маршрут для обрання переможця та відправлення повідомлення
