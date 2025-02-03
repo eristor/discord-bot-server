@@ -15,7 +15,8 @@ const client = new Client({
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMembers,
     GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent
+    GatewayIntentBits.MessageContent,
+    GatewayIntentBits.MessageReactions
   ]
 });
 
@@ -24,7 +25,9 @@ const CHANNEL_ID = process.env.CHANNEL_ID;
 const PORT = process.env.PORT || 3000;
 const STATS_FILE = process.env.STATS_FILE_PATH || './userStats.json';
 const WINNERS_STATS_FILE = path.resolve('./freakWinners.json');
+const REACTIONS_STATS_FILE = path.resolve('./reactionsStats.json');
 
+let reactionStats = {};
 let userStats = {};
 let freakWinners = {};
 
@@ -34,6 +37,10 @@ if (fs.existsSync(STATS_FILE)) {
 
 if (fs.existsSync(WINNERS_STATS_FILE)) {
   freakWinners = JSON.parse(fs.readFileSync(WINNERS_STATS_FILE, 'utf8'));
+}
+
+if (fs.existsSync(REACTIONS_STATS_FILE)) {
+  reactionStats = JSON.parse(fs.readFileSync(REACTIONS_STATS_FILE, 'utf8'));
 }
 
 client.login(process.env.DISCORD_TOKEN);
@@ -89,6 +96,25 @@ client.on('messageCreate', (message) => {
 // API для отримання статистики користувачів
 app.get('/api/user-stats', (req, res) => {
   res.status(200).json(userStats);
+});
+
+// Обробка додавання реакцій
+client.on('messageReactionAdd', (reaction) => {
+  const emoji = reaction.emoji.name;
+
+  if (!reactionStats[emoji]) {
+    reactionStats[emoji] = 0;
+  }
+
+  reactionStats[emoji] += 1;
+
+  // Зберігаємо статистику у файл
+  fs.writeFileSync(REACTIONS_STATS_FILE, JSON.stringify(reactionStats, null, 2));
+});
+
+// Маршрут для отримання статистики реакцій
+app.get('/api/reactions-stats', (req, res) => {
+  res.status(200).json(reactionStats);
 });
 
 // Маршрут для отримання списку учасників сервера
