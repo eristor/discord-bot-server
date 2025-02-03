@@ -100,22 +100,25 @@ app.get('/api/user-stats', (req, res) => {
 
 // Обробка додавання реакцій
 client.on('messageReactionAdd', (reaction) => {
-  const emoji = reaction.emoji.name;
+  const emoji = reaction.emoji;
 
-  if (!reactionStats[emoji]) {
-    reactionStats[emoji] = 0;
+  // Створюємо ключ реакції у форматі `ім'я:ід`, щоб уникнути конфліктів
+  const reactionKey = emoji.id ? `${emoji.name}:${emoji.id}` : emoji.name;
+
+  if (!reactionStats[reactionKey]) {
+    reactionStats[reactionKey] = {
+      name: emoji.name,
+      imageUrl: emoji.url || emoji.toString(), // URL або текстове представлення емодзі
+      count: 0
+    };
   }
 
-  reactionStats[emoji] += 1;
+  reactionStats[reactionKey].count += 1;
 
   // Зберігаємо статистику у файл
   fs.writeFileSync(REACTIONS_STATS_FILE, JSON.stringify(reactionStats, null, 2));
 });
 
-// Маршрут для отримання статистики реакцій
-app.get('/api/reactions-stats', (req, res) => {
-  res.status(200).json(reactionStats);
-});
 
 // Маршрут для отримання списку учасників сервера
 app.get('/api/members', async (req, res) => {
