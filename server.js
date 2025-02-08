@@ -42,13 +42,13 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
   // Користувач увійшов у спеціальний канал для створення голосового каналу
   if (newState.channelId === PREFIX_CHANNEL_ID) {
     // Створюємо новий голосовий канал
-    const newChannel = await guild.channels.create({
+    const newVoiceChannel = await guild.channels.create({
       name: `${newState.member.user.username}'s Channel`,
-      type: 2, // Тип каналу: голосовий
-      parent: newState.channel.parentId, // Встановлюємо ту ж категорію, що й у початкового каналу
+      type: ChannelType.GuildVoice,
+      parent: newState.channel.parentId,
       permissionOverwrites: [
         {
-          id: newState.member.id, // Дозволяємо власнику каналу всі права
+          id: newState.member.id,
           allow: [
             PermissionsBitField.Flags.Connect,
             PermissionsBitField.Flags.ManageChannels,
@@ -57,24 +57,52 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
           ]
         },
         {
-          id: guild.roles.everyone.id, // Інші користувачі можуть лише підключатися
+          id: guild.roles.everyone.id,
           allow: [PermissionsBitField.Flags.Connect]
         }
       ]
     });
 
-    // Переміщуємо користувача до нового каналу
-    await newState.member.voice.setChannel(newChannel);
+    // Створюємо текстовий канал у тій самій категорії
+    const newTextChannel = await guild.channels.create({
+      name: `${newState.member.user.username}-commands`,
+      type: ChannelType.GuildText,
+      parent: newVoiceChannel.parentId,
+      permissionOverwrites: [
+        {
+          id: newState.member.id,
+          allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages]
+        },
+        {
+          id: guild.roles.everyone.id,
+          deny: [PermissionsBitField.Flags.ViewChannel]
+        }
+      ]
+    });
 
-    console.log(`Created voice channel: ${newChannel.name} for ${newState.member.user.tag}`);
+    // Переміщуємо користувача до нового голосового каналу
+    await newState.member.voice.setChannel(newVoiceChannel);
 
-    // Відстежуємо вихід користувача з каналу
+    // Надсилаємо повідомлення з командами в текстовий канал
+    await newTextChannel.send(`Привіт, ${newState.member.user.username}! Ваш канал створено. Ось команди, які ви можете використовувати:
+
+**/rename <нова назва>** - змінити назву каналу
+**/limit <кількість>** - встановити ліміт користувачів
+**/lock** - закрити доступ до каналу
+**/unlock** - відкрити доступ до каналу
+
+Використовуйте ці команди, щоб налаштувати ваш голосовий канал.`);
+
+    console.log(`Created voice and text channels for ${newState.member.user.tag}`);
+
+    // Відстежуємо вихід користувача з голосового каналу
     const interval = setInterval(async () => {
-      const updatedChannel = await guild.channels.fetch(newChannel.id);
+      const updatedChannel = await guild.channels.fetch(newVoiceChannel.id);
       if (updatedChannel.members.size === 0) {
         clearInterval(interval);
-        await updatedChannel.delete();
-        console.log(`Deleted empty channel: ${newChannel.name}`);
+        await newVoiceChannel.delete();
+        await newTextChannel.delete();
+        console.log(`Deleted channels for ${newState.member.user.tag}`);
       }
     }, 5000);
   }
