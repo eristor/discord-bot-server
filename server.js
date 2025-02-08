@@ -141,7 +141,7 @@ app.get('/api/members', async (req, res) => {
       id: member.id,
       username: member.user.username,
       avatar: member.user.displayAvatarURL(),
-      role: member.roles.highest.name
+      roles: member.roles.cache.map(role => role.name)
     }));
 
     res.status(200).json(membersData);
