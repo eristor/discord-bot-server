@@ -152,14 +152,32 @@ app.get('/api/members', async (req, res) => {
 });
 
 // Handle message create with keyword check
-client.on('messageCreate', (message) => {
+client.on('messageCreate', async (message) => {
   if (message.author.bot) return;
 
   if (message.content.toLowerCase().includes('фрік') ||
       message.content.toLowerCase().includes('fr1kadelka') ||
       message.content.toLowerCase().includes('даун')) {
-    message.react('🤡');
-    message.reply('Може таки тегним головного по фріковсту fr1kadelka🤡🤡🤡🤡?');
+    try {
+      // Отримуємо останнього переможця фріка дня з бази даних
+      const { data: lastWinner, error } = await supabase
+        .from('freak_winners')
+        .select('username')
+        .order('win_count', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (error || !lastWinner) {
+        console.error('Error fetching last winner:', error);
+        message.reply('Не вдалося отримати останнього фріка дня.');
+      } else {
+        message.react('🤡');
+        message.reply(`Може таки тегним головного по фріковству ${lastWinner.username} 🤡🤡🤡🤡?`);
+      }
+    } catch (err) {
+      console.error('Error handling messageCreate event:', err);
+      message.reply('Сталася помилка під час обробки вашого запиту.');
+    }
   }
 });
 
