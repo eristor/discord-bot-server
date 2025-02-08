@@ -20,18 +20,132 @@ const client = new Client({
     GatewayIntentBits.GuildMembers,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
-    GatewayIntentBits.GuildMessageReactions
+    GatewayIntentBits.GuildMessageReactions,
+    GatewayIntentBits.GuildVoiceStates,
   ]
 });
 
 const GUILD_ID = process.env.GUILD_ID;
 const CHANNEL_ID = process.env.CHANNEL_ID;
 const PORT = process.env.PORT || 3000;
+const PREFIX_CHANNEL_ID = process.env.PREFIX_CHANNEL_ID;
 
 client.login(process.env.DISCORD_TOKEN);
 
 client.once('ready', () => {
   console.log(`Logged in as ${client.user.tag}`);
+});
+
+client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
+  const guild = newState.guild;
+
+  // Користувач увійшов у спеціальний канал для створення голосового каналу
+  if (newState.channelId === PREFIX_CHANNEL_ID) {
+    // Створюємо новий голосовий канал
+    const newChannel = await guild.channels.create({
+      name: `${newState.member.user.username}'s Channel`,
+      type: 2, // Тип каналу: голосовий
+      parent: newState.channel.parentId, // Встановлюємо ту ж категорію, що й у початкового каналу
+      permissionOverwrites: [
+        {
+          id: newState.member.id, // Дозволяємо власнику каналу всі права
+          allow: [
+            PermissionsBitField.Flags.Connect,
+            PermissionsBitField.Flags.ManageChannels,
+            PermissionsBitField.Flags.MuteMembers,
+            PermissionsBitField.Flags.DeafenMembers
+          ]
+        },
+        {
+          id: guild.roles.everyone.id, // Інші користувачі можуть лише підключатися
+          allow: [PermissionsBitField.Flags.Connect]
+        }
+      ]
+    });
+
+    // Переміщуємо користувача до нового каналу
+    await newState.member.voice.setChannel(newChannel);
+
+    console.log(`Created voice channel: ${newChannel.name} for ${newState.member.user.tag}`);
+
+    // Відстежуємо вихід користувача з каналу
+    const interval = setInterval(async () => {
+      const updatedChannel = await guild.channels.fetch(newChannel.id);
+      if (updatedChannel.members.size === 0) {
+        clearInterval(interval);
+        await updatedChannel.delete();
+        console.log(`Deleted empty channel: ${newChannel.name}`);
+      }
+    }, 5000);
+  }
+});
+
+client.on('messageCreate', async (message) => {
+  if (message.content.startsWith('/rename')) {
+    const newName = message.content.split(' ').slice(1).join(' ');
+    const voiceChannel = message.member.voice.channel;
+
+    if (!voiceChannel) {
+      return message.reply('Ви повинні бути в голосовому каналі, щоб перейменувати його.');
+    }
+
+    if (voiceChannel.permissionsFor(message.member).has(PermissionsBitField.Flags.ManageChannels)) {
+      await voiceChannel.setName(newName);
+      message.reply(`Канал перейменовано на: ${newName}`);
+    } else {
+      message.reply('У вас немає прав на керування цим каналом.');
+    }
+  }
+
+  if (message.content.startsWith('/limit')) {
+    const limit = parseInt(message.content.split(' ')[1], 10);
+    const voiceChannel = message.member.voice.channel;
+
+    if (!voiceChannel) {
+      return message.reply('Ви повинні бути в голосовому каналі, щоб встановити ліміт.');
+    }
+
+    if (voiceChannel.permissionsFor(message.member).has(PermissionsBitField.Flags.ManageChannels)) {
+      await voiceChannel.setUserLimit(limit);
+      message.reply(`Ліміт користувачів у каналі встановлено на: ${limit}`);
+    } else {
+      message.reply('У вас немає прав на керування цим каналом.');
+    }
+  }
+
+  if (message.content.startsWith('/lock')) {
+    const voiceChannel = message.member.voice.channel;
+
+    if (!voiceChannel) {
+      return message.reply('Ви повинні бути в голосовому каналі, щоб заблокувати його.');
+    }
+
+    if (voiceChannel.permissionsFor(message.member).has(PermissionsBitField.Flags.ManageChannels)) {
+      await voiceChannel.permissionOverwrites.edit(message.guild.roles.everyone, {
+        Connect: false
+      });
+      message.reply('Канал заблоковано.');
+    } else {
+      message.reply('У вас немає прав на керування цим каналом.');
+    }
+  }
+
+  if (message.content.startsWith('/unlock')) {
+    const voiceChannel = message.member.voice.channel;
+
+    if (!voiceChannel) {
+      return message.reply('Ви повинні бути в голосовому каналі, щоб розблокувати його.');
+    }
+
+    if (voiceChannel.permissionsFor(message.member).has(PermissionsBitField.Flags.ManageChannels)) {
+      await voiceChannel.permissionOverwrites.edit(message.guild.roles.everyone, {
+        Connect: true
+      });
+      message.reply('Канал розблоковано.');
+    } else {
+      message.reply('У вас немає прав на керування цим каналом.');
+    }
+  }
 });
 
 // Function to send a message to the Discord channel
