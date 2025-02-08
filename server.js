@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
-import { Client, GatewayIntentBits, Events, PermissionsBitField } from 'discord.js';
+import { Client, GatewayIntentBits, Events, PermissionsBitField, ChannelType } from 'discord.js';
 
 dotenv.config();
 
